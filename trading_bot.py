@@ -1,12 +1,3 @@
-import logging
-
-for handler in logging.root.handlers[:]:
-    logging.root.removeHandler(handler)
-
-logging.basicConfig(filename='log.txt', 
-                    level=logging.INFO,
-                    format=' %(asctime)s - %(levelname)s - %(message)s')
-
 import config
 import json
 import math
@@ -54,13 +45,6 @@ def update_trade_file(trade):
     with open('trade.json', 'w') as f:
         json.dump(trade, f)
 
-def update_trades_file(trade):
-    trade = list(trade.values())
-
-    with open('trades.csv', 'a', newline='', encoding='utf-8') as f:
-        w = writer(f)
-        w.writerow(trade)
-
 def update_portfolio_file(client, portfolio):
     portfolio['USDT_balance'] = float(client.get_asset_balance(asset='USDT')['free'])
     portfolio['BTC_balance'] = float(client.get_asset_balance(asset='BTC')['free'])
@@ -70,25 +54,6 @@ def update_portfolio_file(client, portfolio):
 
 def truncate(number, decimals):
     return math.floor(number * 10 ** decimals) / 10 ** decimals
-
-def push_notification(trade, side):
-    app = Application(config.PUSHOVER_APP_KEY)
-    user = app.get_user(config.PUSHOVER_USER_KEY)
-    
-    if side == 'BUY':
-        txt = '<b>Buying</b> at {} $'.format(trade['entry_price']) 
-    
-    elif side == 'SELL':
-        roc = round((trade['exit_price'] - trade['entry_price']) / trade['entry_price'] * 100, 1)
-        txt = '<b>Selling</b> at {} $\nPrice ROC is {} %'.format(trade['exit_price'], roc) 
-    
-    message = user.create_message(
-        title = 'Binance Trading Bot',
-        message = txt,
-        html=True
-    )
-
-    message.send()
 
 def compute_strategy(client, df):
     trade, portfolio = read_json_files()
@@ -104,8 +69,6 @@ def compute_strategy(client, df):
 
             btc_quantity = truncate(portfolio['BTC_balance'], PRECISION)
             order = client.create_order(symbol=SYMBOL, side='SELL', type='MARKET', quantity=btc_quantity)
-
-            push_notification(trade, 'SELL')
 
             update_trades_file(trade)
             trade = dict.fromkeys(trade, 0)
@@ -123,8 +86,6 @@ def compute_strategy(client, df):
 
         btc_quantity = truncate(portfolio['USDT_balance'] / trade['entry_price'], PRECISION)
         order = client.create_order(symbol=SYMBOL, side='BUY', type='MARKET', quantity=btc_quantity)
-
-        push_notification(trade, 'BUY')
 
     update_trade_file(trade)
     update_portfolio_file(client, portfolio)
